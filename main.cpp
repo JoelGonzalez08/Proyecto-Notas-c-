@@ -5,15 +5,21 @@
 #include <conio.h>
 using namespace std;
 
+struct Materia {
+    string nombre;
+    int notas[3] = {0, 0, 0};
+};
+
 struct Estudiante {
     string nombre, carrera;
     int id;
-    int notas[3] = {0,0,0};
+    Materia* materias;
+    int numMaterias;
 };
 
 class GestorEstudiantes {
 private:
-    Estudiante** estudiantes;
+    Estudiante* estudiantes;
     int numEstudiantes = 0;
 
     void guardarEnArchivo() {
@@ -23,13 +29,17 @@ private:
             return;
         }
         for (int i = 0; i < numEstudiantes; i++) {
-            archivo << estudiantes[i]->nombre << '\n'
-                    << estudiantes[i]->id << '\n'
-                    << estudiantes[i]->carrera << '\n';
-            for (int j = 0; j < 3; j++) {
-                archivo << estudiantes[i]->notas[j] << ' ';
+            archivo << estudiantes[i].nombre << '\n'
+                    << estudiantes[i].id << '\n'
+                    << estudiantes[i].carrera << '\n'
+                    << estudiantes[i].numMaterias << '\n';
+            for (int j = 0; j < estudiantes[i].numMaterias; j++) {
+                archivo << estudiantes[i].materias[j].nombre << ' ';
+                for (int k = 0; k < 3; k++) {
+                    archivo << estudiantes[i].materias[j].notas[k] << ' ';
+                }
+                archivo << "\n";
             }
-            archivo << '\n';
         }
         archivo.close();
     }
@@ -37,31 +47,34 @@ private:
     void cargarDesdeArchivo() {
         ifstream archivo("datos.txt", ios::in);
         if (!archivo) {
-            // Si no existe el archivo, no hay nada que cargar.
             return;
         }
-
         string linea;
         while (getline(archivo, linea)) {
-            Estudiante* nuevoEstudiante = new Estudiante;
-            nuevoEstudiante->nombre = linea;
+            Estudiante nuevoEstudiante;
+            nuevoEstudiante.nombre = linea;
             getline(archivo, linea);
             try {
-                nuevoEstudiante->id = stoi(linea);
+                nuevoEstudiante.id = stoi(linea);
             } catch (const invalid_argument& e) {
                 cout << "Error: ID invalido en el archivo.\n";
-                delete nuevoEstudiante;
                 continue;
             }
             getline(archivo, linea);
-            nuevoEstudiante->carrera = linea;
+            nuevoEstudiante.carrera = linea;
 
-            for (int j = 0; j < 3; j++) {
-                archivo >> nuevoEstudiante->notas[j];
+            getline(archivo, linea);
+            nuevoEstudiante.numMaterias = stoi(linea);
+            nuevoEstudiante.materias = new Materia[nuevoEstudiante.numMaterias];
+            for (int j = 0; j < nuevoEstudiante.numMaterias; j++) {
+                archivo >> nuevoEstudiante.materias[j].nombre;
+                for (int k = 0; k < 3; k++) {
+                    archivo >> nuevoEstudiante.materias[j].notas[k];
+                }
             }
-            archivo.ignore(); // Ignorar el salto de línea al final de las notas.
+            archivo.ignore();
 
-            Estudiante** temp = new Estudiante*[numEstudiantes + 1];
+            Estudiante* temp = new Estudiante[numEstudiantes + 1];
             for (int i = 0; i < numEstudiantes; i++) {
                 temp[i] = estudiantes[i];
             }
@@ -73,116 +86,200 @@ private:
         archivo.close();
     }
 
+    void introducirNotasEnMateria(Materia& materia) {
+        int opcion;
+        bool notasCompletadas[3] = {false, false, false}; // Para verificar si las notas se han introducido
+        do {
+            system("cls");
+            cout << "Introducir notas para la materia " << materia.nombre << ":\n";
+            cout << "1. Introducir Nota 1\n";
+            cout << "2. Introducir Nota 2\n";
+            cout << "3. Introducir Nota 3\n";
+            cout << "4. Regresar al menu anterior\n";
+            cout << "Seleccione una opcion: ";
+            cin >> opcion;
+
+            if (opcion >= 1 && opcion <= 3) {
+                int notaIndex = opcion - 1;
+                if (notaIndex > 0 && !notasCompletadas[notaIndex - 1]) {
+                    cout << "Primero debe introducir la Nota " << notaIndex << ".\n";
+                    system("pause");
+                    continue;
+                }
+
+                int nota;
+                do {
+                    cout << "Introduzca la Nota " << opcion << " (0-5): ";
+                    cin >> nota;
+                    if (nota < 0 || nota > 5) {
+                        cout << "Nota invalida. La nota debe estar entre 0 y 5.\n";
+                    }
+                } while (nota < 0 || nota > 5);
+
+                materia.notas[notaIndex] = nota;
+                notasCompletadas[notaIndex] = true;
+                guardarEnArchivo();
+            } else if (opcion == 4) {
+                cout << "Regresando al menu anterior.\n";
+            } else {
+                cout << "Opcion no valida.\n";
+            }
+            system("pause");
+        } while (opcion != 4);
+    }
+
+  void menuMaterias(Estudiante* estudiante) {
+    int opcion;
+    do {
+        system("cls");
+        cout << "Menu de Materias para el estudiante " << estudiante->nombre << " (Codigo: T000" << estudiante->id << "):\n";
+        for (int i = 0; i < estudiante->numMaterias; i++) {
+            cout << i + 1 << ". " << estudiante->materias[i].nombre << '\n';
+        }
+        cout << estudiante->numMaterias + 1 << ". Agregar nueva materia\n";
+        cout << "0. Regresar al menu anterior\n";
+        cout << "Seleccione una opcion: ";
+        cin >> opcion;
+
+        if (opcion > 0 && opcion <= estudiante->numMaterias) {
+            int materiaIndex = opcion - 1;
+            introducirNotasEnMateria(estudiante->materias[materiaIndex]);
+        } else if (opcion == estudiante->numMaterias + 1) {
+            Materia* nuevasMaterias = new Materia[estudiante->numMaterias + 1];
+            for (int i = 0; i < estudiante->numMaterias; i++) {
+                nuevasMaterias[i] = estudiante->materias[i];
+            }
+            delete[] estudiante->materias;
+            estudiante->materias = nuevasMaterias;
+
+            // Validación del nombre de la materia
+            do {
+                cout << "Nombre de la nueva materia (sin números): ";
+                getline(cin, estudiante->materias[estudiante->numMaterias].nombre);
+            } while (!validarCadena(estudiante->materias[estudiante->numMaterias].nombre, false)); // No permitir espacios NI NÚMEROS
+
+            estudiante->numMaterias++;
+            guardarEnArchivo();
+        } else if (opcion != 0) {
+            cout << "Opcion no valida.\n";
+        }
+    } while (opcion != 0);
+}
+
+
+ bool validarCadena(const string& cadena, bool permitirEspacios = true) {
+    for (char c : cadena) {
+        if (!isalpha(c) && (!permitirEspacios || !isspace(c))) { 
+            return false; // Caracter inválido (no es letra ni espacio permitido)
+        }
+    }
+    return !cadena.empty(); // No puede estar vacía
+ }
+
+bool validarEntero(int& numero) {
+    string entrada;
+    getline(cin, entrada);
+
+    for (char c : entrada) {
+        if (!isdigit(c)) {
+            cout << "Entrada inválida. Ingrese solo números.\n";
+            return false;
+        }
+    }
+
+    // Convertir la cadena a entero
+    try {
+        numero = stoi(entrada);
+        return true;
+    } catch (const std::invalid_argument&) {
+        cout << "Entrada demasiado grande o no numérica.\n";
+        return false;
+    }
+}
+
 public:
     GestorEstudiantes() {
-        estudiantes = new Estudiante*[1];
+        estudiantes = new Estudiante[1];
         cargarDesdeArchivo();
     }
 
     ~GestorEstudiantes() {
         for (int i = 0; i < numEstudiantes; i++) {
-            delete estudiantes[i];
+            delete[] estudiantes[i].materias;
         }
         delete[] estudiantes;
     }
 
-   void crearEstudiante() {
-    Estudiante* nuevoEstudiante = new Estudiante;
-    system("cls");
-    cout << "Nombre: ";
-    cin.ignore();
-    getline(cin, nuevoEstudiante->nombre);
-
-    bool idUnico;
-    do {
-        idUnico = true;
-        cout << "ID: ";
-        cin >> nuevoEstudiante->id;
-
-        // Verificar si el ID ya existe
-        for (int i = 0; i < numEstudiantes; i++) {
-            if (estudiantes[i]->id == nuevoEstudiante->id) {
-                cout << "El ID ya existe. Por favor, introduzca un ID diferente.\n";
+    void crearEstudiante() {
+        Estudiante nuevoEstudiante;
+        system("cls");
+        cout << "Nombre: ";
+        cin.ignore();
+        do {
+        cout << "Nombre (solo letras): ";
+        getline(cin, nuevoEstudiante.nombre);
+    } while (!validarCadena(nuevoEstudiante.nombre, true)); // Permitir espacios
+        
+        bool idUnico;
+        do {
+            idUnico = true;
+            cout << "Codigo (solo numeros): T000";
+            if (!validarEntero(nuevoEstudiante.id)) {
                 idUnico = false;
-                break;
+                continue;
             }
+
+            for (int i = 0; i < numEstudiantes; i++) {
+                if (estudiantes[i].id == nuevoEstudiante.id) {
+                    cout << "El codigo ya existe. Por favor, introduzca uno diferente.\n";
+                    idUnico = false;
+                    break;
+                }
+            }
+        } while (!idUnico);
+
+
+        do {
+        cout << "Carrera (solo letras): ";
+        getline(cin, nuevoEstudiante.carrera);
+    } while (!validarCadena(nuevoEstudiante.carrera, true)); // Permitir espacios
+
+
+        nuevoEstudiante.numMaterias = 0;
+        nuevoEstudiante.materias = nullptr;
+
+        Estudiante* temp = new Estudiante[numEstudiantes + 1];
+        for (int i = 0; i < numEstudiantes; i++) {
+            temp[i] = estudiantes[i];
         }
-    } while (!idUnico);
+        temp[numEstudiantes] = nuevoEstudiante;
+        delete[] estudiantes;
+        estudiantes = temp;
+        numEstudiantes++;
 
-    cout << "Carrera: ";
-    cin.ignore();
-    getline(cin, nuevoEstudiante->carrera);
-
-    Estudiante** temp = new Estudiante*[numEstudiantes + 1];
-    for (int i = 0; i < numEstudiantes; i++) {
-        temp[i] = estudiantes[i];
+        guardarEnArchivo();
     }
-    temp[numEstudiantes] = nuevoEstudiante;
-    delete[] estudiantes;
-    estudiantes = temp;
-    numEstudiantes++;
-
-    guardarEnArchivo();
-}
 
     void introducirNotas() {
-    int id;
-    system("cls");
-    cout << "ID del estudiante: ";
-    cin >> id;
-    for (int i = 0; i < numEstudiantes; i++) {
-        if (estudiantes[i]->id == id) {
-            int opcion;
-            bool notasCompletadas[3] = {false, false, false}; // Para verificar si las notas se han introducido
-            do {
-                system("cls");
-                cout << "Introducir notas para el estudiante con ID " << id << ":\n";
-                cout << "1. Introducir Nota 1\n";
-                cout << "2. Introducir Nota 2\n";
-                cout << "3. Introducir Nota 3\n";
-                cout << "4. Regresar al menu anterior\n";
-                cout << "Seleccione una opcion: ";
-                cin >> opcion;
-
-                if (opcion >= 1 and opcion <= 3) {
-                    int notaIndex = opcion - 1;
-                    if (notaIndex > 0 and !notasCompletadas[notaIndex - 1]) {
-                        cout << "Primero debe introducir la Nota " << notaIndex << ".\n";
-                        system("pause");
-                        continue;
-                    }
-
-                    int nota;
-                    do {
-                        cout << "Introduzca la Nota " << opcion << " (0-5): ";
-                        cin >> nota;
-                        if (nota < 0 or nota > 5) {
-                            cout << "Nota invalida. La nota debe estar entre 0 y 5.\n";
-                        }
-                    } while (nota < 0 or nota > 5);
-
-                    estudiantes[i]->notas[notaIndex] = nota;
-                    notasCompletadas[notaIndex] = true;
-                    guardarEnArchivo();
-                } else if (opcion == 4) {
-                    cout << "Regresando al menu anterior.\n";
-                } else {
-                    cout << "Opcion no valida.\n";
-                }
-                system("pause");
-            } while (opcion != 4);
-            return;
+        int id;
+        system("cls");
+        cout << "Codigo del estudiante: T000";
+        cin >> id;
+        for (int i = 0; i < numEstudiantes; i++) {
+            if (estudiantes[i].id == id) {
+                menuMaterias(&estudiantes[i]);
+                return;
+            }
         }
+        cout << "Estudiante no encontrado.\n";
     }
-    cout << "Estudiante no encontrado.\n";
-}
 
     void modificarEstudiante() {
         int id;
-        cout << "ID del estudiante a modificar: ";
+        cout << "Codigo del estudiante a modificar: T000";
         cin >> id;
         for (int i = 0; i < numEstudiantes; i++) {
-            if (estudiantes[i]->id == id) {
+            if (estudiantes[i].id == id) {
                 int opcion;
                 do {
                     system("cls");
@@ -198,13 +295,13 @@ public:
                     case 1:
                         cout << "Nuevo nombre: ";
                         cin.ignore();
-                        getline(cin, estudiantes[i]->nombre);
+                        getline(cin, estudiantes[i].nombre);
                         guardarEnArchivo();
                         break;
                     case 2:
                         cout << "Nueva carrera: ";
                         cin.ignore();
-                        getline(cin, estudiantes[i]->carrera);
+                        getline(cin, estudiantes[i].carrera);
                         guardarEnArchivo();
                         break;
                     case 3:
@@ -217,6 +314,7 @@ public:
                         cout << "Opcion no valida.\n";
                         break;
                     }
+                    system("pause");
                 } while (opcion != 4);
                 return;
             }
@@ -224,69 +322,92 @@ public:
         cout << "Estudiante no encontrado.\n";
     }
 
-    void mostrarEstudiantes() {
-        for (int i = 0; i < numEstudiantes; i++) {
-            system("cls");
-            cout << "Nombre: " << estudiantes[i]->nombre << endl;
-            cout << "ID: " << estudiantes[i]->id << endl;
-            cout << "Carrera: " << estudiantes[i]->carrera << endl;
-            cout << "Notas:";
-            for (int j = 0; j < 3; j++) {
-                cout << " " << estudiantes[i]->notas[j];
-            }
-            cout << endl;
-            double suma = 0;
-            for (int j = 0; j < 3; j++) {
-                suma += estudiantes[i]->notas[j];
-            }
-            double promedio = suma / 3;
-            cout << "Nota final: " << promedio << endl;
-            getch();
-        }
+void buscarEstudiante() {
+    if (numEstudiantes == 0) {
+        cout << "No hay estudiantes registrados.\n";
+        return;
     }
 
-    void eliminarEstudiante() {
+    int id;
+        cout << "Codigo del estudiante a modificar: T000";
+        cin >> id;
+        for (int i = 0; i < numEstudiantes; i++) {
+            if (estudiantes[i].id == id) {
+                cout << "Codigo: T000" << estudiantes[i].id << '\n'
+                 << "Nombre: " << estudiantes[i].nombre << '\n'
+                 << "Carrera: " << estudiantes[i].carrera << '\n';
+            cout << "Materias:\n";
+            for (int j = 0; j < estudiantes[i].numMaterias; j++) {
+                cout << "  " << estudiantes[i].materias[j].nombre << ": ";
+                for (int k = 0; k < 3; k++) {
+                    cout << estudiantes[i].materias[j].notas[k] << ' ';
+                }
+                cout << '\n';
+            }
+            cout << "-----------------------------\n";
+        }
+}
+}
+
+void eliminarEstudiante() {
     if (numEstudiantes == 0) {
-        cout << "No hay estudiantes para eliminar.\n";
-        system("pause");
+        cout << "No hay estudiantes registrados.\n";
         return;
     }
 
     system("cls");
-    cout << "Seleccione el estudiante a eliminar:\n";
+    cout << "Eliminar Estudiante:\n";
     for (int i = 0; i < numEstudiantes; i++) {
-        cout << i + 1 << ". " << estudiantes[i]->nombre << " (ID: " << estudiantes[i]->id << ")\n";
+        cout << i + 1 << ". " << estudiantes[i].nombre << " (Codigo: T000" << estudiantes[i].id << ")\n";
     }
-    cout << "0. Cancelar\n";
-    cout << "Seleccione una opcion: ";
+    cout << "0. Regresar al menu anterior\n";
+    cout << "Seleccione el estudiante a eliminar: ";
+
     int opcion;
     cin >> opcion;
 
-    if (opcion == 0) {
-        cout << "Cancelando...\n";
-        system("pause");
-        return;
-    }
+    if (opcion >= 1 && opcion <= numEstudiantes) {
+        int estudianteIndex = opcion - 1;
 
-    if (opcion < 1 || opcion > numEstudiantes) {
+        char confirmacion;
+        cout << "¿Está seguro de que desea eliminar a " << estudiantes[estudianteIndex].nombre << "? (s/n): ";
+        cin >> confirmacion;
+
+        if (confirmacion == 's' || confirmacion == 'S') {  // Comparación manual
+            // Mover los elementos restantes hacia la izquierda para llenar el espacio vacío
+            for (int j = estudianteIndex; j < numEstudiantes - 1; j++) {
+                estudiantes[j] = estudiantes[j + 1];
+            }
+
+            numEstudiantes--;
+            cout << "Estudiante eliminado.\n";
+            guardarEnArchivo();
+        } else {
+            cout << "Eliminación cancelada.\n";
+        }
+    } else if (opcion != 0) {
         cout << "Opcion no valida.\n";
-        system("pause");
-        return;
     }
-
-    int index = opcion - 1;
-    delete estudiantes[index];
-
-    for (int i = index; i < numEstudiantes - 1; i++) {
-        estudiantes[i] = estudiantes[i + 1];
-    }
-
-    numEstudiantes--;
-    guardarEnArchivo();
-    cout << "Estudiante eliminado correctamente.\n";
-    system("pause");
 }
 
+void mostrarEstudiantes() {
+     system("cls");
+         cout << "Lista de estudiantes:\n";
+    for (int i = 0; i < numEstudiantes; i++) {
+            cout << "Codigo: T000" << estudiantes[i].id << '\n'
+                << "Nombre: " << estudiantes[i].nombre << '\n'
+                << "Carrera: " << estudiantes[i].carrera << '\n';
+            cout << "Materias:\n";
+                for (int j = 0; j < estudiantes[i].numMaterias; j++) {
+                 cout << " " << estudiantes[i].materias[j].nombre << ": ";
+                 for (int k = 0; k < 3; k++) {
+                cout << estudiantes[i].materias[j].notas[k] << ' ';
+                 }
+                 cout << '\n';
+         }
+            cout << "-----------------------------\n";
+    }
+    }
 };
 
 int main() {
@@ -294,13 +415,14 @@ int main() {
     int opcion;
     do {
         system("cls");
-        cout << "\nMenu:\n";
+        cout << "Menu Principal:\n";
         cout << "1. Crear estudiante\n";
-        cout << "2. Modificar estudiante\n";
-        cout << "3. Introducir notas\n";
-        cout << "4. Mostrar estudiantes\n";
-        cout << "5. Eliminar estudiante\n";
-        cout << "0. Salir\n";
+        cout << "2. Introducir notas\n";
+        cout << "3. Modificar estudiante\n";
+        cout << "4. Eliminar estudiante\n";
+        cout << "5. Mostrar estudiantes\n";
+        cout << "6. Buscar estudiante\n";
+        cout << "7. Salir\n";
         cout << "Seleccione una opcion: ";
         cin >> opcion;
 
@@ -309,25 +431,27 @@ int main() {
             gestor.crearEstudiante();
             break;
         case 2:
-            gestor.modificarEstudiante();
-            break;
-        case 3:
             gestor.introducirNotas();
             break;
-        case 4:
-            gestor.mostrarEstudiantes();
+        case 3:
+            gestor.modificarEstudiante();
             break;
-        case 5:
+        case 4:
             gestor.eliminarEstudiante();
             break;
-        case 0:
+        case 5:
+            gestor.mostrarEstudiantes();
+            break;
+        case 6:
+            gestor.buscarEstudiante();
+        case 7:
             cout << "Saliendo del programa.\n";
             break;
         default:
             cout << "Opcion no valida.\n";
             break;
         }
-    } while (opcion != 0);
-
+        system("pause");
+    } while (opcion != 7);
     return 0;
 }
